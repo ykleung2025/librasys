@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>圖書借還記錄系統</title>
+    <!-- Tailwind CSS (RWD 介面) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Tesseract.js (瀏覽器純前端 OCR 文字辨識，免 API Key) -->
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+    <!-- 導航欄 -->
+    <nav class="bg-indigo-600 text-white shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-bold flex items-center gap-2">
+                <i class="fa-solid fa-book-open"></i> 圖書借還系統
+            </h1>
+            <div class="space-x-2">
+                <button onclick="switchTab('borrow')" id="tab-borrow-btn" class="px-3 py-1.5 rounded-lg bg-indigo-800 font-medium text-sm">
+                    <i class="fa-solid fa-camera"></i> 拍照借書
+                </button>
+                <button onclick="switchTab('admin')" id="tab-admin-btn" class="px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium text-sm">
+                    <i class="fa-solid fa-user-shield"></i> 管理後台
+                </button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主內容區 -->
+    <main class="max-w-4xl mx-auto p-4">
+
+        <!-- 1. 拍照借書 -->
+        <section id="view-borrow" class="space-y-6">
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center">
+                <h2 class="text-lg font-bold text-slate-700 mb-2">借書登記 (拍照辨識)</h2>
+                <p class="text-xs text-slate-500 mb-6">請將【書籍封面】與【學生證】擺放在一起拍攝照片</p>
+
+                <div class="flex justify-center">
+                    <label class="cursor-pointer bg-indigo-50 border-2 border-dashed border-indigo-300 hover:border-indigo-500 p-8 rounded-2xl flex flex-col items-center justify-center w-full max-w-md transition-all">
+                        <i class="fa-solid fa-camera-retro text-4xl text-indigo-500 mb-2"></i>
+                        <span class="text-sm font-semibold text-indigo-700">點擊拍照 / 上傳相片</span>
+                        <span class="text-xs text-slate-400 mt-1">無需 API，本地直接解析</span>
+                        <input type="file" id="imageInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
+                    </label>
+                </div>
+
+                <!-- 辨識中 Loading -->
+                <div id="ocrLoading" class="hidden my-6">
+                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
+                    <p class="text-sm text-indigo-600 mt-2 font-medium" id="loadingText">正在掃描照片中的文字...</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 2. 管理員後台 -->
+        <section id="view-admin" class="hidden space-y-4">
+            <!-- 密碼框 -->
+            <div id="admin-login" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-md mx-auto text-center">
+                <i class="fa-solid fa-lock text-3xl text-indigo-500 mb-3"></i>
+                <h2 class="text-lg font-bold mb-4">管理員身份驗證</h2>
+                <input type="password" id="adminPassword" placeholder="請輸入密碼 (預設: 1212)" class="w-full px-4 py-2 border rounded-lg mb-4 text-center focus:ring-2 focus:ring-indigo-500 outline-none">
+                <button onclick="checkPassword()" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 font-semibold">登入</button>
+            </div>
+
+            <!-- 管理清單 -->
+            <div id="admin-content" class="hidden space-y-4">
+                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
+                    <h2 class="text-lg font-bold text-slate-700">目前借出記錄庫</h2>
+                    <button onclick="fetchBorrowRecords()" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
+                        <i class="fa-solid fa-rotate-right"></i> 重新整理
+                    </button>
+                </div>
+
+                <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left border-collapse">
+                            <thead>
+                                <tr class="bg-slate-50 text-slate-500 text-xs uppercase border-b">
+                                    <th class="p-4">書名</th>
+                                    <th class="p-4">借書人</th>
+                                    <th class="p-4">借出日期</th>
+                                    <th class="p-4 text-center">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="recordsTableBody" class="divide-y divide-slate-100 text-sm">
+                                <tr>
+                                    <td colspan="4" class="p-4 text-center text-slate-400">載入中...</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- 資料核對 Popup Modal -->
+    <div id="confirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 flex justify-between items-center">
+                <span>核對借書資料</span>
+                <span class="text-xs font-normal text-slate-400">可即時對照照片修改</span>
+            </h3>
+            
+            <!-- 放大對照照片 -->
+            <div class="relative bg-slate-900 rounded-lg overflow-hidden h-48 flex items-center justify-center">
+                <img id="previewImage" class="max-h-full object-contain" alt="Preview">
+            </div>
+
+            <div class="space-y-3">
+                <div>
+                    <label class="text-xs text-slate-500 font-semibold">書名：</label>
+                    <input type="text" id="modalBookTitle" placeholder="請確認或手動輸入書名" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
+                </div>
+                <div>
+                    <label class="text-xs text-slate-500 font-semibold">借書人姓名：</label>
+                    <input type="text" id="modalBorrowerName" placeholder="請確認或手動輸入姓名" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
+                </div>
+            </div>
+
+            <!-- 錯誤提示 -->
+            <div id="modalError" class="hidden bg-rose-50 text-rose-600 text-xs p-3 rounded-lg border border-rose-200"></div>
+
+            <div class="flex gap-2 pt-2">
+                <button onclick="closeModal()" class="w-1/2 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 font-medium">修改 / 重拍</button>
+                <button id="btnConfirmBorrow" onclick="submitBorrow()" class="w-1/2 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">確認借書</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 系統設定 Drawer -->
+    <footer class="mt-12 text-center text-xs text-slate-400 p-4">
+        <button onclick="toggleConfig()" class="underline hover:text-slate-600">設定 Google 試算表連結</button>
+        <div id="configPanel" class="hidden max-w-md mx-auto mt-4 p-4 bg-white rounded-xl border text-left space-y-3 shadow-md">
+            <div>
+                <label class="block text-slate-600 font-semibold mb-1">Google Apps Script URL:</label>
+                <input type="text" id="gasUrlInput" class="w-full border p-2 rounded text-xs" placeholder="https://script.google.com/macros/s/.../exec">
+            </div>
+            <button onclick="saveConfig()" class="w-full bg-slate-800 text-white py-2 rounded text-xs font-semibold">儲存連結</button>
+        </div>
+    </footer>
+
+    <script>
+        let GAS_URL = localStorage.getItem('GAS_URL') || '';
+
+        window.onload = () => {
+            document.getElementById('gasUrlInput').value = GAS_URL;
+        };
+
+        function toggleConfig() {
+            document.getElementById('configPanel').classList.toggle('hidden');
+        }
+
+        function saveConfig() {
+            GAS_URL = document.getElementById('gasUrlInput').value.trim();
+            localStorage.setItem('GAS_URL', GAS_URL);
+            alert('試算表連結已儲存！');
+            toggleConfig();
+        }
+
+        function switchTab(tab) {
+            if (tab === 'borrow') {
+                document.getElementById('view-borrow').classList.remove('hidden');
+                document.getElementById('view-admin').classList.add('hidden');
+                document.getElementById('tab-borrow-btn').classList.replace('hover:bg-indigo-700', 'bg-indigo-800');
+                document.getElementById('tab-admin-btn').classList.replace('bg-indigo-800', 'hover:bg-indigo-700');
+            } else {
+                document.getElementById('view-borrow').classList.add('hidden');
+                document.getElementById('view-admin').classList.remove('hidden');
+                document.getElementById('tab-admin-btn').classList.replace('hover:bg-indigo-700', 'bg-indigo-800');
+                document.getElementById('tab-borrow-btn').classList.replace('bg-indigo-800', 'hover:bg-indigo-700');
+            }
+        }
+
+        // 使用 Tesseract.js 本地辨識照片文字
+        async function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            if (!GAS_URL) {
+                alert('請先在頁尾設定 Google Apps Script 網址！');
+                toggleConfig();
+                return;
+            }
+
+            const previewImg = document.getElementById('previewImage');
+            previewImg.src = URL.createObjectURL(file);
+
+            document.getElementById('ocrLoading').classList.remove('hidden');
+            document.getElementById('loadingText').innerText = "瀏覽器正在進行光學文字辨識 (OCR)...";
+
+            try {
+                // 自動辨識中英文
+                const worker = await Tesseract.createWorker('chi_tra+eng');
+                const ret = await worker.recognize(file);
+                await worker.terminate();
+
+                const lines = ret.data.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                
+                // 預設抓取長度較長的文字作為參考欄位
+                document.getElementById('modalBookTitle').value = lines[0] || '';
+                document.getElementById('modalBorrowerName').value = lines[1] || '';
+                document.getElementById('modalError').classList.add('hidden');
+                document.getElementById('confirmModal').classList.remove('hidden');
+            } catch (err) {
+                // 就算 OCR 辨識失誤，依然彈出視窗讓用戶對照照片手動修正
+                document.getElementById('modalBookTitle').value = '';
+                document.getElementById('modalBorrowerName').value = '';
+                document.getElementById('confirmModal').classList.remove('hidden');
+            } finally {
+                document.getElementById('ocrLoading').classList.add('hidden');
+                event.target.value = '';
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('confirmModal').classList.add('hidden');
+        }
+
+        // 送出借書資料
+        async function submitBorrow() {
+            const bookTitle = document.getElementById('modalBookTitle').value.trim();
+            const borrowerName = document.getElementById('modalBorrowerName').value.trim();
+            const errorDiv = document.getElementById('modalError');
+
+            if (!bookTitle || !borrowerName) {
+                errorDiv.innerText = "請輸入書名與借書人姓名！";
+                errorDiv.classList.remove('hidden');
+                return;
+            }
+
+            const btn = document.getElementById('btnConfirmBorrow');
+            btn.disabled = true;
+            btn.innerText = "儲存中...";
+
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'borrow',
+                        bookTitle: bookTitle,
+                        borrowerName: borrowerName
+                    })
+                });
+
+                const res = await response.json();
+
+                if (res.status === 'success') {
+                    alert(res.message);
+                    closeModal();
+                } else {
+                    errorDiv.innerText = res.message;
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (err) {
+                errorDiv.innerText = "無法連接到資料庫，請檢查 GAS 連結！";
+                errorDiv.classList.remove('hidden');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "確認借書";
+            }
+        }
+
+        // 管理員登入驗證
+        function checkPassword() {
+            const pwd = document.getElementById('adminPassword').value;
+            if (pwd === '1212') {
+                document.getElementById('admin-login').classList.add('hidden');
+                document.getElementById('admin-content').classList.remove('hidden');
+                fetchBorrowRecords();
+            } else {
+                alert('密碼錯誤！');
+            }
+        }
+
+        // 獲取借閱記錄
+        async function fetchBorrowRecords() {
+            const tbody = document.getElementById('recordsTableBody');
+            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400"><i class="fa-solid fa-spinner animate-spin"></i> 載入資料中...</td></tr>';
+
+            try {
+                const res = await fetch(GAS_URL);
+                const result = await res.json();
+
+                if (result.status === 'success' && result.data.length > 0) {
+                    tbody.innerHTML = result.data.map(item => `
+                        <tr class="hover:bg-slate-50">
+                            <td class="p-4 font-semibold text-slate-800">《${item.bookTitle}》</td>
+                            <td class="p-4 text-slate-600">${item.borrowerName}</td>
+                            <td class="p-4 text-slate-500 text-xs">${item.borrowDate} <span class="text-indigo-600">(${item.status})</span></td>
+                            <td class="p-4 text-center space-x-2">
+                                <button onclick="handleAction('renew', '${item.id}')" class="px-2.5 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded text-xs font-medium">續借</button>
+                                <button onclick="handleAction('return', '${item.id}')" class="px-2.5 py-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded text-xs font-medium">已還書</button>
+                            </td>
+                        </tr>
+                    `).join('');
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">目前沒有借出中的記錄。</td></tr>';
+                }
+            } catch (err) {
+                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-rose-500">載入失敗，請確認 GAS 連結。</td></tr>';
+            }
+        }
+
+        // 還書 (刪除) 與 續借 (更新)
+        async function handleAction(action, id) {
+            const confirmMsg = action === 'return' ? '確認已還書？此記錄將從資料庫中刪除。' : '確認辦理續借？';
+            if (!confirm(confirmMsg)) return;
+
+            try {
+                const response = await fetch(GAS_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: action, id: id })
+                });
+
+                const res = await response.json();
+                alert(res.message);
+                fetchBorrowRecords();
+            } catch (err) {
+                alert('操作失敗：' + err.message);
+            }
+        }
+    </script>
+</body>
+</html>
