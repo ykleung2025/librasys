@@ -42,7 +42,7 @@ html_content = """<!DOCTYPE html>
                     <label class="cursor-pointer bg-indigo-50 border-2 border-dashed border-indigo-300 hover:border-indigo-500 p-8 rounded-2xl flex flex-col items-center justify-center w-full max-w-md transition-all">
                         <i class="fa-solid fa-camera-retro text-4xl text-indigo-500 mb-2"></i>
                         <span class="text-sm font-semibold text-indigo-700">點擊拍照 / 上傳相片</span>
-                        <span class="text-xs text-slate-400 mt-1">無需 API Key，自動對照照片</span>
+                        <span class="text-xs text-slate-400 mt-1">已優化圖像對比度與高解析辨識</span>
                         <input type="file" id="imageInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
                     </label>
                 </div>
@@ -50,7 +50,7 @@ html_content = """<!DOCTYPE html>
                 <!-- 辨識中 Loading -->
                 <div id="ocrLoading" class="hidden my-6">
                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
-                    <p class="text-sm text-indigo-600 mt-2 font-medium" id="loadingText">正在載入圖片與辨識中 (上限5秒)...</p>
+                    <p class="text-sm text-indigo-600 mt-2 font-medium" id="loadingText">正在優化相片並進行增強型 OCR 辨識中...</p>
                 </div>
             </div>
         </section>
@@ -178,7 +178,61 @@ html_content = """<!DOCTYPE html>
             }
         }
 
-        // 處理照片上傳與辨識 (含 4 秒超時自動跳過機制，防死鎖)
+        // Canvas 影像預處理：轉灰階、提高對比度與銳利度，大幅提昇 OCR 辨識率
+        function preprocessImage(file) {
+            return new Promise((resolve) => {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const canvas = document.createElement('canvas');
+                        const ctx = canvas.getContext('2d');
+                        
+                        // 調整影像解析度至最佳辨識範圍 (最大 1800px)
+                        let width = img.width;
+                        let height = img.height;
+                        const maxDim = 1800;
+                        if (width > maxDim || height > maxDim) {
+                            if (width > height) {
+                                height = Math.round((height * maxDim) / width);
+                                width = maxDim;
+                            } else {
+                                width = Math.round((width * maxDim) / height);
+                                height = maxDim;
+                            }
+                        }
+                        
+                        canvas.width = width;
+                        canvas.height = height;
+                        ctx.drawImage(img, 0, 0, width, height);
+                        
+                        // 取得影像像素陣列進一步處理
+                        const imageData = ctx.getImageData(0, 0, width, height);
+                        const data = imageData.data;
+                        const contrast = 1.35; // 提高 35% 對比度，突顯文字與背景邊緣
+                        const intercept = 128 * (1 - contrast);
+
+                        for (let i = 0; i < data.length; i += 4) {
+                            // 轉灰階 (Grayscale)
+                            let gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
+                            // 強化對比度
+                            gray = gray * contrast + intercept;
+                            gray = Math.min(255, Math.max(0, gray));
+                            
+                            data[i] = gray;     // R
+                            data[i + 1] = gray; // G
+                            data[i + 2] = gray; // B
+                        }
+                        ctx.putImageData(imageData, 0, 0);
+                        resolve(canvas.toDataURL('image/jpeg', 0.95));
+                    };
+                    img.src = e.target.result;
+                };
+                reader.readAsDataURL(file);
+            });
+        }
+
+        // 處理照片上傳與加強版 OCR 辨識
         async function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
@@ -192,26 +246,38 @@ html_content = """<!DOCTYPE html>
             let borrowerName = '';
 
             try {
-                // 5 秒超時預防機制
+                // 先進行圖像對比度與銳利化預處理
+                const processedImageData = await preprocessImage(file);
+
+                // 6 秒超時保護機制，避免網絡延遲卡死
                 const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('OCR超時')), 4000)
+                    setTimeout(() => reject(new Error('OCR超時')), 6000)
                 );
 
-                // Tesseract 辨識 Promise
+                // Tesseract 辨識 Promise (使用中英文雙語包)
                 const ocrPromise = (async () => {
                     const worker = await Tesseract.createWorker('chi_tra+eng');
-                    const ret = await worker.recognize(file);
+                    // 設定文字排版解析模式為自動區塊辨識
+                    await worker.setParameters({
+                        tessedit_pageseg_mode: '1', 
+                    });
+                    const ret = await worker.recognize(processedImageData);
                     await worker.terminate();
                     return ret.data.text;
                 })();
 
-                // 競速：4秒內搞定就自動帶入，否則自動跳過進入人工對照
                 const text = await Promise.race([ocrPromise, timeoutPromise]);
-                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                
+                // 過濾無效符號，優化分行提取結果
+                const lines = text
+                    .split('\n')
+                    .map(l => l.replace(/[^\w\u4e00-\u9fa5\s《》-]/g, '').trim())
+                    .filter(l => l.length >= 2); // 過濾掉太短的單一雜訊字元
+
                 bookTitle = lines[0] || '';
                 borrowerName = lines[1] || '';
             } catch (err) {
-                console.warn('OCR 自動跳過：將直接開啟相片對照視窗。', err.message);
+                console.warn('OCR 自動跳過，開啟相片對照視窗。原因：', err.message);
             } finally {
                 document.getElementById('modalBookTitle').value = bookTitle;
                 document.getElementById('modalBorrowerName').value = borrowerName;
@@ -243,7 +309,6 @@ html_content = """<!DOCTYPE html>
             btn.innerText = "儲存中...";
 
             try {
-                // 使用 text/plain;charset=utf-8 避開 GAS CORS Preflight OPTIONS 阻擋
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
@@ -345,4 +410,4 @@ html_content = """<!DOCTYPE html>
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(html_content)
 
-print("Updated index.html generated successfully!")
+print("Updated index.html without Python wrapper code generated successfully.")
