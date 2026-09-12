@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+html_content = """<!DOCTYPE html>
 <html lang="zh-HK">
 <head>
     <meta charset="UTF-8">
@@ -42,7 +42,7 @@
                     <label class="cursor-pointer bg-indigo-50 border-2 border-dashed border-indigo-300 hover:border-indigo-500 p-8 rounded-2xl flex flex-col items-center justify-center w-full max-w-md transition-all">
                         <i class="fa-solid fa-camera-retro text-4xl text-indigo-500 mb-2"></i>
                         <span class="text-sm font-semibold text-indigo-700">點擊拍照 / 上傳相片</span>
-                        <span class="text-xs text-slate-400 mt-1">無需 API，本地直接解析</span>
+                        <span class="text-xs text-slate-400 mt-1">無需 API Key，自動對照照片</span>
                         <input type="file" id="imageInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
                     </label>
                 </div>
@@ -50,7 +50,7 @@
                 <!-- 辨識中 Loading -->
                 <div id="ocrLoading" class="hidden my-6">
                     <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
-                    <p class="text-sm text-indigo-600 mt-2 font-medium" id="loadingText">正在掃描照片中的文字...</p>
+                    <p class="text-sm text-indigo-600 mt-2 font-medium" id="loadingText">正在載入圖片與辨識中 (上限5秒)...</p>
                 </div>
             </div>
         </section>
@@ -61,7 +61,8 @@
             <div id="admin-login" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-md mx-auto text-center">
                 <i class="fa-solid fa-lock text-3xl text-indigo-500 mb-3"></i>
                 <h2 class="text-lg font-bold mb-4">管理員身份驗證</h2>
-                <input type="password" id="adminPassword" placeholder="請輸入密碼 (預設: 1212)" class="w-full px-4 py-2 border rounded-lg mb-4 text-center focus:ring-2 focus:ring-indigo-500 outline-none">
+                <input type="password" id="adminPassword" placeholder="請輸入4位數字密碼" class="w-full px-4 py-2 border rounded-lg mb-2 text-center focus:ring-2 focus:ring-indigo-500 outline-none">
+                <p class="text-xs text-slate-400 mb-4">提示：預設密碼為 1212</p>
                 <button onclick="checkPassword()" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 font-semibold">登入</button>
             </div>
 
@@ -103,7 +104,7 @@
         <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
             <h3 class="text-lg font-bold text-slate-800 border-b pb-2 flex justify-between items-center">
                 <span>核對借書資料</span>
-                <span class="text-xs font-normal text-slate-400">可即時對照照片修改</span>
+                <span class="text-xs font-normal text-slate-400">請對照照片修改資料</span>
             </h3>
             
             <!-- 放大對照照片 -->
@@ -126,7 +127,7 @@
             <div id="modalError" class="hidden bg-rose-50 text-rose-600 text-xs p-3 rounded-lg border border-rose-200"></div>
 
             <div class="flex gap-2 pt-2">
-                <button onclick="closeModal()" class="w-1/2 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 font-medium">修改 / 重拍</button>
+                <button onclick="closeModal()" class="w-1/2 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 font-medium">重拍 / 取消</button>
                 <button id="btnConfirmBorrow" onclick="submitBorrow()" class="w-1/2 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">確認借書</button>
             </div>
         </div>
@@ -134,7 +135,7 @@
 
     <!-- 系統設定 Drawer -->
     <footer class="mt-12 text-center text-xs text-slate-400 p-4">
-        <button onclick="toggleConfig()" class="underline hover:text-slate-600">設定 Google 試算表連結</button>
+        <button onclick="toggleConfig()" class="underline hover:text-slate-600">進階系統設定</button>
         <div id="configPanel" class="hidden max-w-md mx-auto mt-4 p-4 bg-white rounded-xl border text-left space-y-3 shadow-md">
             <div>
                 <label class="block text-slate-600 font-semibold mb-1">Google Apps Script URL:</label>
@@ -145,7 +146,8 @@
     </footer>
 
     <script>
-        let GAS_URL = localStorage.getItem('GAS_URL') || '';
+        const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxF_jZZgITHU0UfFigeKcNc1B-Qp45CKnetghAj-8aqXmaNvyfkS8i-sAThBjaQLrRi/exec';
+        let GAS_URL = localStorage.getItem('GAS_URL') || DEFAULT_GAS_URL;
 
         window.onload = () => {
             document.getElementById('gasUrlInput').value = GAS_URL;
@@ -156,9 +158,9 @@
         }
 
         function saveConfig() {
-            GAS_URL = document.getElementById('gasUrlInput').value.trim();
+            GAS_URL = document.getElementById('gasUrlInput').value.trim() || DEFAULT_GAS_URL;
             localStorage.setItem('GAS_URL', GAS_URL);
-            alert('試算表連結已儲存！');
+            alert('試算表連結已更新！');
             toggleConfig();
         }
 
@@ -176,42 +178,45 @@
             }
         }
 
-        // 使用 Tesseract.js 本地辨識照片文字
+        // 處理照片上傳與辨識 (含 4 秒超時自動跳過機制，防死鎖)
         async function handleImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
-
-            if (!GAS_URL) {
-                alert('請先在頁尾設定 Google Apps Script 網址！');
-                toggleConfig();
-                return;
-            }
 
             const previewImg = document.getElementById('previewImage');
             previewImg.src = URL.createObjectURL(file);
 
             document.getElementById('ocrLoading').classList.remove('hidden');
-            document.getElementById('loadingText').innerText = "瀏覽器正在進行光學文字辨識 (OCR)...";
+
+            let bookTitle = '';
+            let borrowerName = '';
 
             try {
-                // 自動辨識中英文
-                const worker = await Tesseract.createWorker('chi_tra+eng');
-                const ret = await worker.recognize(file);
-                await worker.terminate();
+                // 5 秒超時預防機制
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('OCR超時')), 4000)
+                );
 
-                const lines = ret.data.text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
-                
-                // 預設抓取長度較長的文字作為參考欄位
-                document.getElementById('modalBookTitle').value = lines[0] || '';
-                document.getElementById('modalBorrowerName').value = lines[1] || '';
+                // Tesseract 辨識 Promise
+                const ocrPromise = (async () => {
+                    const worker = await Tesseract.createWorker('chi_tra+eng');
+                    const ret = await worker.recognize(file);
+                    await worker.terminate();
+                    return ret.data.text;
+                })();
+
+                // 競速：4秒內搞定就自動帶入，否則自動跳過進入人工對照
+                const text = await Promise.race([ocrPromise, timeoutPromise]);
+                const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+                bookTitle = lines[0] || '';
+                borrowerName = lines[1] || '';
+            } catch (err) {
+                console.warn('OCR 自動跳過：將直接開啟相片對照視窗。', err.message);
+            } finally {
+                document.getElementById('modalBookTitle').value = bookTitle;
+                document.getElementById('modalBorrowerName').value = borrowerName;
                 document.getElementById('modalError').classList.add('hidden');
                 document.getElementById('confirmModal').classList.remove('hidden');
-            } catch (err) {
-                // 就算 OCR 辨識失誤，依然彈出視窗讓用戶對照照片手動修正
-                document.getElementById('modalBookTitle').value = '';
-                document.getElementById('modalBorrowerName').value = '';
-                document.getElementById('confirmModal').classList.remove('hidden');
-            } finally {
                 document.getElementById('ocrLoading').classList.add('hidden');
                 event.target.value = '';
             }
@@ -238,8 +243,10 @@
             btn.innerText = "儲存中...";
 
             try {
+                // 使用 text/plain;charset=utf-8 避開 GAS CORS Preflight OPTIONS 阻擋
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({
                         action: 'borrow',
                         bookTitle: bookTitle,
@@ -257,7 +264,7 @@
                     errorDiv.classList.remove('hidden');
                 }
             } catch (err) {
-                errorDiv.innerText = "無法連接到資料庫，請檢查 GAS 連結！";
+                errorDiv.innerText = "無法連接到資料庫，請檢查 GAS 部署權限！";
                 errorDiv.classList.remove('hidden');
             } finally {
                 btn.disabled = false;
@@ -284,7 +291,13 @@
 
             try {
                 const res = await fetch(GAS_URL);
-                const result = await res.json();
+                const rawText = await res.text();
+                let result;
+                try {
+                    result = JSON.parse(rawText);
+                } catch (e) {
+                    throw new Error("GAS 回傳非 JSON 格式！請確認 Apps Script 部署權限是否設為「任何人 (Anyone)」。");
+                }
 
                 if (result.status === 'success' && result.data.length > 0) {
                     tbody.innerHTML = result.data.map(item => `
@@ -302,7 +315,7 @@
                     tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">目前沒有借出中的記錄。</td></tr>';
                 }
             } catch (err) {
-                tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-rose-500">載入失敗，請確認 GAS 連結。</td></tr>';
+                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-rose-500 font-medium">❌ 載入失敗：${err.message}</td></tr>`;
             }
         }
 
@@ -314,6 +327,7 @@
             try {
                 const response = await fetch(GAS_URL, {
                     method: 'POST',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                     body: JSON.stringify({ action: action, id: id })
                 });
 
@@ -326,4 +340,9 @@
         }
     </script>
 </body>
-</html>
+</html>"""
+
+with open("index.html", "w", encoding="utf-8") as f:
+    f.write(html_content)
+
+print("Updated index.html generated successfully!")
