@@ -7,7 +7,7 @@ html_content = """<!DOCTYPE html>
     <!-- Tailwind CSS (RWD 介面) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <!-- Tesseract.js (瀏覽器純前端 OCR 文字辨識，免 API Key) -->
+    <!-- Tesseract.js (瀏覽器純前端 OCR 文字辨識) -->
     <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
@@ -32,25 +32,80 @@ html_content = """<!DOCTYPE html>
     <!-- 主內容區 -->
     <main class="max-w-4xl mx-auto p-4">
 
-        <!-- 1. 拍照借書 -->
+        <!-- 1. 拍照借書 (獨立分開拍攝 / 輸入) -->
         <section id="view-borrow" class="space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center">
-                <h2 class="text-lg font-bold text-slate-700 mb-2">借書登記 (拍照辨識)</h2>
-                <p class="text-xs text-slate-500 mb-6">請將【書籍封面】與【學生證】擺放在一起拍攝照片</p>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                <h2 class="text-lg font-bold text-slate-700 mb-1 text-center">借書登記 (分開拍攝 / 輸入)</h2>
+                <p class="text-xs text-slate-500 mb-6 text-center">您可以分別拍攝【書籍封面】與【學生證】，或直接手動輸入文字</p>
 
-                <div class="flex justify-center">
-                    <label class="cursor-pointer bg-indigo-50 border-2 border-dashed border-indigo-300 hover:border-indigo-500 p-8 rounded-2xl flex flex-col items-center justify-center w-full max-w-md transition-all">
-                        <i class="fa-solid fa-camera-retro text-4xl text-indigo-500 mb-2"></i>
-                        <span class="text-sm font-semibold text-indigo-700">點擊拍照 / 上傳相片</span>
-                        <span class="text-xs text-slate-400 mt-1">已優化圖像對比度與高解析辨識</span>
-                        <input type="file" id="imageInput" accept="image/*" capture="environment" class="hidden" onchange="handleImageUpload(event)">
-                    </label>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    
+                    <!-- (1) 書籍封面拍攝與輸入 -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h3 class="font-bold text-sm text-indigo-700 mb-2 flex items-center gap-1.5">
+                                <i class="fa-solid fa-book"></i> 1. 書籍封面
+                            </h3>
+                            <label class="cursor-pointer w-full bg-white border-2 border-dashed border-indigo-200 hover:border-indigo-400 p-4 rounded-xl flex flex-col items-center justify-center transition-all mb-3">
+                                <i class="fa-solid fa-camera text-2xl text-indigo-500 mb-1"></i>
+                                <span class="text-xs font-semibold text-slate-600">拍攝 / 上傳書籍封面</span>
+                                <input type="file" id="bookImageInput" accept="image/*" capture="environment" class="hidden" onchange="handleBookImageUpload(event)">
+                            </label>
+                            
+                            <!-- 書籍照片預覽與辨識狀態 -->
+                            <div id="bookPreviewBox" class="hidden w-full h-36 bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center relative mb-3">
+                                <img id="bookPreviewImg" class="max-h-full object-contain">
+                                <div id="bookOcrLoading" class="hidden absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-xs">
+                                    <div class="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent mb-1"></div>
+                                    <span>辨識書名中...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-slate-500 font-semibold">書名：</label>
+                            <input type="text" id="bookTitleInput" placeholder="拍攝自動帶入或直接輸入" class="w-full mt-1 px-3 py-2 border bg-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
+                        </div>
+                    </div>
+
+                    <!-- (2) 學生證拍攝與輸入 -->
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between space-y-3">
+                        <div>
+                            <h3 class="font-bold text-sm text-indigo-700 mb-2 flex items-center gap-1.5">
+                                <i class="fa-solid fa-id-card"></i> 2. 學生證 / 借書證
+                            </h3>
+                            <label class="cursor-pointer w-full bg-white border-2 border-dashed border-indigo-200 hover:border-indigo-400 p-4 rounded-xl flex flex-col items-center justify-center transition-all mb-3">
+                                <i class="fa-solid fa-camera text-2xl text-indigo-500 mb-1"></i>
+                                <span class="text-xs font-semibold text-slate-600">拍攝 / 上傳學生證</span>
+                                <input type="file" id="idImageInput" accept="image/*" capture="environment" class="hidden" onchange="handleIdImageUpload(event)">
+                            </label>
+                            
+                            <!-- 學生證照片預覽與辨識狀態 -->
+                            <div id="idPreviewBox" class="hidden w-full h-36 bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center relative mb-3">
+                                <img id="idPreviewImg" class="max-h-full object-contain">
+                                <div id="idOcrLoading" class="hidden absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-xs">
+                                    <div class="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent mb-1"></div>
+                                    <span>辨識姓名中...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label class="text-xs text-slate-500 font-semibold">借書人姓名：</label>
+                            <input type="text" id="borrowerNameInput" placeholder="拍攝自動帶入或直接輸入" class="w-full mt-1 px-3 py-2 border bg-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
+                        </div>
+                    </div>
+
                 </div>
 
-                <!-- 辨識中 Loading -->
-                <div id="ocrLoading" class="hidden my-6">
-                    <div class="inline-block animate-spin rounded-full h-8 w-8 border-4 border-indigo-500 border-t-transparent"></div>
-                    <p class="text-sm text-indigo-600 mt-2 font-medium" id="loadingText">正在優化相片並進行增強型 OCR 辨識中...</p>
+                <!-- 錯誤提示區塊 -->
+                <div id="borrowError" class="hidden mt-4 bg-rose-50 text-rose-600 text-xs p-3 rounded-lg border border-rose-200 text-center"></div>
+
+                <!-- 確認提交按鈕 -->
+                <div class="mt-6 flex justify-center">
+                    <button id="btnConfirmBorrow" onclick="submitBorrow()" class="w-full max-w-md py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold shadow-md transition-all text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-check-circle"></i> 確認辦理借書
+                    </button>
                 </div>
             </div>
         </section>
@@ -99,40 +154,6 @@ html_content = """<!DOCTYPE html>
 
     </main>
 
-    <!-- 資料核對 Popup Modal -->
-    <div id="confirmModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-4 z-50">
-        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
-            <h3 class="text-lg font-bold text-slate-800 border-b pb-2 flex justify-between items-center">
-                <span>核對借書資料</span>
-                <span class="text-xs font-normal text-slate-400">請對照照片修改資料</span>
-            </h3>
-            
-            <!-- 放大對照照片 -->
-            <div class="relative bg-slate-900 rounded-lg overflow-hidden h-48 flex items-center justify-center">
-                <img id="previewImage" class="max-h-full object-contain" alt="Preview">
-            </div>
-
-            <div class="space-y-3">
-                <div>
-                    <label class="text-xs text-slate-500 font-semibold">書名：</label>
-                    <input type="text" id="modalBookTitle" placeholder="請確認或手動輸入書名" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
-                </div>
-                <div>
-                    <label class="text-xs text-slate-500 font-semibold">借書人姓名：</label>
-                    <input type="text" id="modalBorrowerName" placeholder="請確認或手動輸入姓名" class="w-full mt-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
-                </div>
-            </div>
-
-            <!-- 錯誤提示 -->
-            <div id="modalError" class="hidden bg-rose-50 text-rose-600 text-xs p-3 rounded-lg border border-rose-200"></div>
-
-            <div class="flex gap-2 pt-2">
-                <button onclick="closeModal()" class="w-1/2 py-2 border border-slate-300 text-slate-600 rounded-lg hover:bg-slate-50 font-medium">重拍 / 取消</button>
-                <button id="btnConfirmBorrow" onclick="submitBorrow()" class="w-1/2 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">確認借書</button>
-            </div>
-        </div>
-    </div>
-
     <!-- 系統設定 Drawer -->
     <footer class="mt-12 text-center text-xs text-slate-400 p-4">
         <button onclick="toggleConfig()" class="underline hover:text-slate-600">進階系統設定</button>
@@ -178,7 +199,7 @@ html_content = """<!DOCTYPE html>
             }
         }
 
-        // Canvas 影像預處理：轉灰階、提高對比度與銳利度，大幅提昇 OCR 辨識率
+        // Canvas 影像預處理：轉灰階、提高對比度與銳利度
         function preprocessImage(file) {
             return new Promise((resolve) => {
                 const reader = new FileReader();
@@ -188,7 +209,6 @@ html_content = """<!DOCTYPE html>
                         const canvas = document.createElement('canvas');
                         const ctx = canvas.getContext('2d');
                         
-                        // 調整影像解析度至最佳辨識範圍 (最大 1800px)
                         let width = img.width;
                         let height = img.height;
                         const maxDim = 1800;
@@ -206,22 +226,18 @@ html_content = """<!DOCTYPE html>
                         canvas.height = height;
                         ctx.drawImage(img, 0, 0, width, height);
                         
-                        // 取得影像像素陣列進一步處理
                         const imageData = ctx.getImageData(0, 0, width, height);
                         const data = imageData.data;
-                        const contrast = 1.35; // 提高 35% 對比度，突顯文字與背景邊緣
+                        const contrast = 1.35;
                         const intercept = 128 * (1 - contrast);
 
                         for (let i = 0; i < data.length; i += 4) {
-                            // 轉灰階 (Grayscale)
                             let gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-                            // 強化對比度
                             gray = gray * contrast + intercept;
                             gray = Math.min(255, Math.max(0, gray));
-                            
-                            data[i] = gray;     // R
-                            data[i + 1] = gray; // G
-                            data[i + 2] = gray; // B
+                            data[i] = gray;
+                            data[i + 1] = gray;
+                            data[i + 2] = gray;
                         }
                         ctx.putImageData(imageData, 0, 0);
                         resolve(canvas.toDataURL('image/jpeg', 0.95));
@@ -232,81 +248,91 @@ html_content = """<!DOCTYPE html>
             });
         }
 
-        // 處理照片上傳與加強版 OCR 辨識
-        async function handleImageUpload(event) {
+        // (1) 處理書籍封面拍照
+        async function handleBookImageUpload(event) {
             const file = event.target.files[0];
             if (!file) return;
 
-            const previewImg = document.getElementById('previewImage');
+            const previewBox = document.getElementById('bookPreviewBox');
+            const previewImg = document.getElementById('bookPreviewImg');
+            const loading = document.getElementById('bookOcrLoading');
+            
             previewImg.src = URL.createObjectURL(file);
-
-            document.getElementById('ocrLoading').classList.remove('hidden');
-
-            let bookTitle = '';
-            let borrowerName = '';
+            previewBox.classList.remove('hidden');
+            loading.classList.remove('hidden');
 
             try {
-                // 先進行圖像對比度與銳利化預處理
-                const processedImageData = await preprocessImage(file);
-
-                // 6 秒超時保護機制，避免網絡延遲卡死
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('OCR超時')), 6000)
-                );
-
-                // Tesseract 辨識 Promise (使用中英文雙語包)
+                const processedImg = await preprocessImage(file);
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('超時')), 5000));
                 const ocrPromise = (async () => {
                     const worker = await Tesseract.createWorker('chi_tra+eng');
-                    // 設定文字排版解析模式為自動區塊辨識
-                    await worker.setParameters({
-                        tessedit_pageseg_mode: '1', 
-                    });
-                    const ret = await worker.recognize(processedImageData);
+                    const ret = await worker.recognize(processedImg);
                     await worker.terminate();
                     return ret.data.text;
                 })();
 
                 const text = await Promise.race([ocrPromise, timeoutPromise]);
-                
-                // 過濾無效符號，優化分行提取結果
-                const lines = text
-                    .split('\n')
-                    .map(l => l.replace(/[^\w\u4e00-\u9fa5\s《》-]/g, '').trim())
-                    .filter(l => l.length >= 2); // 過濾掉太短的單一雜訊字元
-
-                bookTitle = lines[0] || '';
-                borrowerName = lines[1] || '';
+                const lines = text.split('\n').map(l => l.replace(/[^\w\u4e00-\u9fa5\s《》-]/g, '').trim()).filter(l => l.length >= 2);
+                if (lines.length > 0) {
+                    document.getElementById('bookTitleInput').value = lines[0];
+                }
             } catch (err) {
-                console.warn('OCR 自動跳過，開啟相片對照視窗。原因：', err.message);
+                console.warn('書籍 OCR 自動跳過：', err.message);
             } finally {
-                document.getElementById('modalBookTitle').value = bookTitle;
-                document.getElementById('modalBorrowerName').value = borrowerName;
-                document.getElementById('modalError').classList.add('hidden');
-                document.getElementById('confirmModal').classList.remove('hidden');
-                document.getElementById('ocrLoading').classList.add('hidden');
-                event.target.value = '';
+                loading.classList.add('hidden');
             }
         }
 
-        function closeModal() {
-            document.getElementById('confirmModal').classList.add('hidden');
+        // (2) 處理學生證拍照
+        async function handleIdImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const previewBox = document.getElementById('idPreviewBox');
+            const previewImg = document.getElementById('idPreviewImg');
+            const loading = document.getElementById('idOcrLoading');
+            
+            previewImg.src = URL.createObjectURL(file);
+            previewBox.classList.remove('hidden');
+            loading.classList.remove('hidden');
+
+            try {
+                const processedImg = await preprocessImage(file);
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('超時')), 5000));
+                const ocrPromise = (async () => {
+                    const worker = await Tesseract.createWorker('chi_tra+eng');
+                    const ret = await worker.recognize(processedImg);
+                    await worker.terminate();
+                    return ret.data.text;
+                })();
+
+                const text = await Promise.race([ocrPromise, timeoutPromise]);
+                const lines = text.split('\n').map(l => l.replace(/[^\w\u4e00-\u9fa5\s]/g, '').trim()).filter(l => l.length >= 2);
+                if (lines.length > 0) {
+                    document.getElementById('borrowerNameInput').value = lines[0];
+                }
+            } catch (err) {
+                console.warn('學生證 OCR 自動跳過：', err.message);
+            } finally {
+                loading.classList.add('hidden');
+            }
         }
 
         // 送出借書資料
         async function submitBorrow() {
-            const bookTitle = document.getElementById('modalBookTitle').value.trim();
-            const borrowerName = document.getElementById('modalBorrowerName').value.trim();
-            const errorDiv = document.getElementById('modalError');
+            const bookTitle = document.getElementById('bookTitleInput').value.trim();
+            const borrowerName = document.getElementById('borrowerNameInput').value.trim();
+            const errorDiv = document.getElementById('borrowError');
 
             if (!bookTitle || !borrowerName) {
-                errorDiv.innerText = "請輸入書名與借書人姓名！";
+                errorDiv.innerText = "請輸入或拍攝書名與借書人姓名！";
                 errorDiv.classList.remove('hidden');
                 return;
             }
 
             const btn = document.getElementById('btnConfirmBorrow');
             btn.disabled = true;
-            btn.innerText = "儲存中...";
+            btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 儲存中...';
 
             try {
                 const response = await fetch(GAS_URL, {
@@ -323,7 +349,12 @@ html_content = """<!DOCTYPE html>
 
                 if (res.status === 'success') {
                     alert(res.message);
-                    closeModal();
+                    // 清空輸入
+                    document.getElementById('bookTitleInput').value = '';
+                    document.getElementById('borrowerNameInput').value = '';
+                    document.getElementById('bookPreviewBox').classList.add('hidden');
+                    document.getElementById('idPreviewBox').classList.add('hidden');
+                    errorDiv.classList.add('hidden');
                 } else {
                     errorDiv.innerText = res.message;
                     errorDiv.classList.remove('hidden');
@@ -333,7 +364,7 @@ html_content = """<!DOCTYPE html>
                 errorDiv.classList.remove('hidden');
             } finally {
                 btn.disabled = false;
-                btn.innerText = "確認借書";
+                btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> 確認辦理借書';
             }
         }
 
@@ -410,4 +441,4 @@ html_content = """<!DOCTYPE html>
 with open("index.html", "w", encoding="utf-8") as f:
     f.write(html_content)
 
-print("Updated index.html without Python wrapper code generated successfully.")
+print("Generated clean index.html!")
