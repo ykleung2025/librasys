@@ -3,16 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>圖書借還記錄系統</title>
-    <!-- Tailwind CSS (RWD 介面) -->
+    <title>圖書借還系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-    <!-- Tesseract.js (瀏覽器純前端 OCR 文字辨識) -->
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen text-slate-800">
 
-    <!-- 導航欄 -->
     <nav class="bg-indigo-600 text-white shadow-lg">
         <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
             <h1 class="text-xl font-bold flex items-center gap-2">
@@ -20,168 +16,134 @@
             </h1>
             <div class="space-x-2">
                 <button onclick="switchTab('borrow')" id="tab-borrow-btn" class="px-3 py-1.5 rounded-lg bg-indigo-800 font-medium text-sm">
-                    <i class="fa-solid fa-camera"></i> 拍照借書
+                    <i class="fa-solid fa-camera"></i> 借用人拍照
                 </button>
                 <button onclick="switchTab('admin')" id="tab-admin-btn" class="px-3 py-1.5 rounded-lg hover:bg-indigo-700 font-medium text-sm">
-                    <i class="fa-solid fa-user-shield"></i> 管理後台
+                    <i class="fa-solid fa-user-shield"></i> 管理員後台
                 </button>
             </div>
         </div>
     </nav>
 
-    <!-- 主內容區 -->
     <main class="max-w-4xl mx-auto p-4">
 
-        <!-- 1. 拍照借書 (獨立分開拍攝 / 輸入) -->
+        <!-- 1. 借用人拍照上傳頁面 -->
         <section id="view-borrow" class="space-y-6">
-            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
-                <h2 class="text-lg font-bold text-slate-700 mb-1 text-center">借書登記 (分開拍攝 / 輸入)</h2>
-                <p class="text-xs text-slate-500 mb-6 text-center">您可以分別拍攝【書籍封面】與【學生證】，或直接手動輸入文字</p>
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 text-center">
+                <h2 class="text-lg font-bold text-slate-700 mb-1">借書登記 (合照上傳)</h2>
+                <p class="text-xs text-slate-500 mb-6">請將【書本】與【學生證】放在一起拍攝一張清晰照片</p>
 
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    
-                    <!-- (1) 書籍封面拍攝與輸入 -->
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between space-y-3">
-                        <div>
-                            <h3 class="font-bold text-sm text-indigo-700 mb-2 flex items-center gap-1.5">
-                                <i class="fa-solid fa-book"></i> 1. 書籍封面
-                            </h3>
-                            <label class="cursor-pointer w-full bg-white border-2 border-dashed border-indigo-200 hover:border-indigo-400 p-4 rounded-xl flex flex-col items-center justify-center transition-all mb-3">
-                                <i class="fa-solid fa-camera text-2xl text-indigo-500 mb-1"></i>
-                                <span class="text-xs font-semibold text-slate-600">拍攝 / 上傳書籍封面</span>
-                                <input type="file" id="bookImageInput" accept="image/*" capture="environment" class="hidden" onchange="handleBookImageUpload(event)">
-                            </label>
-                            
-                            <!-- 書籍照片預覽與辨識狀態 -->
-                            <div id="bookPreviewBox" class="hidden w-full h-36 bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center relative mb-3">
-                                <img id="bookPreviewImg" class="max-h-full object-contain">
-                                <div id="bookOcrLoading" class="hidden absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-xs">
-                                    <div class="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent mb-1"></div>
-                                    <span>辨識書名中...</span>
-                                </div>
-                            </div>
-                        </div>
+                <div class="flex flex-col items-center justify-center">
+                    <label class="cursor-pointer w-full max-w-md bg-indigo-50 border-2 border-dashed border-indigo-300 hover:border-indigo-500 p-8 rounded-2xl flex flex-col items-center justify-center transition-all mb-4">
+                        <i class="fa-solid fa-camera-retro text-4xl text-indigo-500 mb-2"></i>
+                        <span class="text-sm font-semibold text-indigo-700">點擊拍照 / 選擇照片</span>
+                        <input type="file" id="photoInput" accept="image/*" capture="environment" class="hidden" onchange="previewPhoto(event)">
+                    </label>
 
-                        <div>
-                            <label class="text-xs text-slate-500 font-semibold">書名：</label>
-                            <input type="text" id="bookTitleInput" placeholder="拍攝自動帶入或直接輸入" class="w-full mt-1 px-3 py-2 border bg-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
-                        </div>
+                    <div id="previewBox" class="hidden w-full max-w-md h-64 bg-slate-900 rounded-xl overflow-hidden relative mb-4">
+                        <img id="previewImg" class="w-full h-full object-contain">
                     </div>
 
-                    <!-- (2) 學生證拍攝與輸入 -->
-                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-200 flex flex-col justify-between space-y-3">
-                        <div>
-                            <h3 class="font-bold text-sm text-indigo-700 mb-2 flex items-center gap-1.5">
-                                <i class="fa-solid fa-id-card"></i> 2. 學生證 / 借書證
-                            </h3>
-                            <label class="cursor-pointer w-full bg-white border-2 border-dashed border-indigo-200 hover:border-indigo-400 p-4 rounded-xl flex flex-col items-center justify-center transition-all mb-3">
-                                <i class="fa-solid fa-camera text-2xl text-indigo-500 mb-1"></i>
-                                <span class="text-xs font-semibold text-slate-600">拍攝 / 上傳學生證</span>
-                                <input type="file" id="idImageInput" accept="image/*" capture="environment" class="hidden" onchange="handleIdImageUpload(event)">
-                            </label>
-                            
-                            <!-- 學生證照片預覽與辨識狀態 -->
-                            <div id="idPreviewBox" class="hidden w-full h-36 bg-slate-900 rounded-lg overflow-hidden flex items-center justify-center relative mb-3">
-                                <img id="idPreviewImg" class="max-h-full object-contain">
-                                <div id="idOcrLoading" class="hidden absolute inset-0 bg-black/60 backdrop-blur-xs flex flex-col items-center justify-center text-white text-xs">
-                                    <div class="animate-spin rounded-full h-6 w-6 border-2 border-white border-t-transparent mb-1"></div>
-                                    <span>辨識姓名中...</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div>
-                            <label class="text-xs text-slate-500 font-semibold">借書人姓名：</label>
-                            <input type="text" id="borrowerNameInput" placeholder="拍攝自動帶入或直接輸入" class="w-full mt-1 px-3 py-2 border bg-white rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium">
-                        </div>
-                    </div>
-
-                </div>
-
-                <!-- 錯誤提示區塊 -->
-                <div id="borrowError" class="hidden mt-4 bg-rose-50 text-rose-600 text-xs p-3 rounded-lg border border-rose-200 text-center"></div>
-
-                <!-- 確認提交按鈕 -->
-                <div class="mt-6 flex justify-center">
-                    <button id="btnConfirmBorrow" onclick="submitBorrow()" class="w-full max-w-md py-3 bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 font-bold shadow-md transition-all text-sm flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-check-circle"></i> 確認辦理借書
+                    <button id="btnUpload" onclick="uploadBorrowPhoto()" class="w-full max-w-md py-3 bg-indigo-600 text-white rounded-xl font-bold shadow-md hover:bg-indigo-700 transition-all text-sm flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-paper-plane"></i> 上傳照片辦理借書
                     </button>
                 </div>
             </div>
         </section>
 
-        <!-- 2. 管理員後台 -->
-        <section id="view-admin" class="hidden space-y-4">
-            <!-- 密碼框 -->
+        <!-- 2. 管理員頁面 -->
+        <section id="view-admin" class="hidden space-y-6">
+            <!-- 登入 -->
             <div id="admin-login" class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 max-w-md mx-auto text-center">
                 <i class="fa-solid fa-lock text-3xl text-indigo-500 mb-3"></i>
                 <h2 class="text-lg font-bold mb-4">管理員身份驗證</h2>
-                <input type="password" id="adminPassword" placeholder="請輸入4位數字密碼" class="w-full px-4 py-2 border rounded-lg mb-2 text-center focus:ring-2 focus:ring-indigo-500 outline-none">
-                <p class="text-xs text-slate-400 mb-4">提示：密碼為4位數字</p>
-                <button onclick="checkPassword()" class="w-full bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 font-semibold">登入</button>
+                <input type="password" id="adminPassword" placeholder="預設密碼 1212" class="w-full px-4 py-2 border rounded-lg mb-4 text-center">
+                <button onclick="checkPassword()" class="w-full bg-indigo-600 text-white py-2 rounded-lg font-semibold">登入</button>
             </div>
 
-            <!-- 管理清單 -->
-            <div id="admin-content" class="hidden space-y-4">
-                <div class="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm">
-                    <h2 class="text-lg font-bold text-slate-700">目前借出記錄庫</h2>
-                    <button onclick="fetchBorrowRecords()" class="text-indigo-600 hover:text-indigo-800 text-sm font-medium">
-                        <i class="fa-solid fa-rotate-right"></i> 重新整理
+            <!-- 後台內容 -->
+            <div id="admin-content" class="hidden space-y-6">
+                
+                <!-- 手動登記 / 揀選借出區 -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
+                    <h3 class="font-bold text-slate-700 mb-4 border-b pb-2 flex items-center gap-2">
+                        <i class="fa-solid fa-hand-holding-hand text-indigo-600"></i> 管理員辦理借出
+                    </h3>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <!-- 書籍選擇/輸入 -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">揀選/輸入 書籍編號：</label>
+                            <select id="selectBook" class="w-full p-2.5 border rounded-lg text-sm bg-white mb-2" onchange="syncBookInput()">
+                                <option value="">-- 請選擇可借出書籍 --</option>
+                            </select>
+                            <input type="text" id="inputBookId" placeholder="或手動輸入書籍編號 (如: B001)" class="w-full p-2 border rounded-lg text-sm">
+                        </div>
+
+                        <!-- 學生選擇/輸入 -->
+                        <div>
+                            <label class="block text-xs font-semibold text-slate-500 mb-1">揀選/輸入 學生編號：</label>
+                            <select id="selectStudent" class="w-full p-2.5 border rounded-lg text-sm bg-white mb-2" onchange="syncStudentInput()">
+                                <option value="">-- 請選擇學生 --</option>
+                            </select>
+                            <input type="text" id="inputStudentId" placeholder="或手動輸入學生編號 (如: S001)" class="w-full p-2 border rounded-lg text-sm">
+                        </div>
+                    </div>
+
+                    <button onclick="submitAdminIssue()" class="w-full mt-5 py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl shadow-md text-sm">
+                        <i class="fa-solid fa-check"></i> 確認借出書本
                     </button>
                 </div>
 
-                <div class="bg-white rounded-xl shadow-sm overflow-hidden border border-slate-200">
+                <!-- 借閱記錄與待處理照片 -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="font-bold text-slate-700">最新上傳相片及借閱紀錄</h3>
+                        <button onclick="loadSystemData()" class="text-indigo-600 text-xs font-semibold"><i class="fa-solid fa-rotate-right"></i> 重新整理</button>
+                    </div>
+
                     <div class="overflow-x-auto">
-                        <table class="w-full text-left border-collapse">
+                        <table class="w-full text-left text-sm">
                             <thead>
-                                <tr class="bg-slate-50 text-slate-500 text-xs uppercase border-b">
-                                    <th class="p-4">書名</th>
-                                    <th class="p-4">借書人</th>
-                                    <th class="p-4">借出日期</th>
-                                    <th class="p-4 text-center">操作</th>
+                                <tr class="bg-slate-50 text-slate-500 text-xs border-b">
+                                    <th class="p-3">時間</th>
+                                    <th class="p-3">相片</th>
+                                    <th class="p-3">書本編號</th>
+                                    <th class="p-3">學生編號</th>
+                                    <th class="p-3">狀態</th>
+                                    <th class="p-3 text-center">操作</th>
                                 </tr>
                             </thead>
-                            <tbody id="recordsTableBody" class="divide-y divide-slate-100 text-sm">
-                                <tr>
-                                    <td colspan="4" class="p-4 text-center text-slate-400">載入中...</td>
-                                </tr>
+                            <tbody id="recordsTbody" class="divide-y">
+                                <tr><td colspan="6" class="p-4 text-center text-slate-400">載入中...</td></tr>
                             </tbody>
                         </table>
                     </div>
                 </div>
+
             </div>
         </section>
-
     </main>
 
-    <!-- 系統設定 Drawer -->
-    <footer class="mt-12 text-center text-xs text-slate-400 p-4">
-        <button onclick="toggleConfig()" class="underline hover:text-slate-600">進階系統設定</button>
-        <div id="configPanel" class="hidden max-w-md mx-auto mt-4 p-4 bg-white rounded-xl border text-left space-y-3 shadow-md">
-            <div>
-                <label class="block text-slate-600 font-semibold mb-1">Google Apps Script URL:</label>
-                <input type="text" id="gasUrlInput" class="w-full border p-2 rounded text-xs" placeholder="https://script.google.com/macros/s/.../exec">
-            </div>
-            <button onclick="saveConfig()" class="w-full bg-slate-800 text-white py-2 rounded text-xs font-semibold">儲存連結</button>
+    <footer class="mt-8 text-center text-xs text-slate-400 p-4">
+        <button onclick="toggleConfig()" class="underline">設定 GAS 網址</button>
+        <div id="configPanel" class="hidden max-w-md mx-auto mt-2 p-3 bg-white border rounded-lg">
+            <input type="text" id="gasUrlInput" class="w-full border p-1.5 text-xs rounded mb-2">
+            <button onclick="saveConfig()" class="w-full bg-slate-800 text-white py-1 rounded text-xs">儲存</button>
         </div>
     </footer>
 
     <script>
         const DEFAULT_GAS_URL = 'https://script.google.com/macros/s/AKfycbxF_jZZgITHU0UfFigeKcNc1B-Qp45CKnetghAj-8aqXmaNvyfkS8i-sAThBjaQLrRi/exec';
         let GAS_URL = localStorage.getItem('GAS_URL') || DEFAULT_GAS_URL;
+        let selectedBase64 = '';
 
-        window.onload = () => {
-            document.getElementById('gasUrlInput').value = GAS_URL;
-        };
-
-        function toggleConfig() {
-            document.getElementById('configPanel').classList.toggle('hidden');
-        }
-
+        window.onload = () => { document.getElementById('gasUrlInput').value = GAS_URL; };
+        function toggleConfig() { document.getElementById('configPanel').classList.toggle('hidden'); }
         function saveConfig() {
             GAS_URL = document.getElementById('gasUrlInput').value.trim() || DEFAULT_GAS_URL;
             localStorage.setItem('GAS_URL', GAS_URL);
-            alert('試算表連結已更新！');
+            alert('已更新！');
             toggleConfig();
         }
 
@@ -189,250 +151,128 @@
             if (tab === 'borrow') {
                 document.getElementById('view-borrow').classList.remove('hidden');
                 document.getElementById('view-admin').classList.add('hidden');
-                document.getElementById('tab-borrow-btn').classList.replace('hover:bg-indigo-700', 'bg-indigo-800');
-                document.getElementById('tab-admin-btn').classList.replace('bg-indigo-800', 'hover:bg-indigo-700');
             } else {
                 document.getElementById('view-borrow').classList.add('hidden');
                 document.getElementById('view-admin').classList.remove('hidden');
-                document.getElementById('tab-admin-btn').classList.replace('hover:bg-indigo-700', 'bg-indigo-800');
-                document.getElementById('tab-borrow-btn').classList.replace('bg-indigo-800', 'hover:bg-indigo-700');
             }
         }
 
-        // Canvas 影像預處理：轉灰階、提高對比度與銳利度
-        function preprocessImage(file) {
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const img = new Image();
-                    img.onload = () => {
-                        const canvas = document.createElement('canvas');
-                        const ctx = canvas.getContext('2d');
-                        
-                        let width = img.width;
-                        let height = img.height;
-                        const maxDim = 1800;
-                        if (width > maxDim || height > maxDim) {
-                            if (width > height) {
-                                height = Math.round((height * maxDim) / width);
-                                width = maxDim;
-                            } else {
-                                width = Math.round((width * maxDim) / height);
-                                height = maxDim;
-                            }
-                        }
-                        
-                        canvas.width = width;
-                        canvas.height = height;
-                        ctx.drawImage(img, 0, 0, width, height);
-                        
-                        const imageData = ctx.getImageData(0, 0, width, height);
-                        const data = imageData.data;
-                        const contrast = 1.35;
-                        const intercept = 128 * (1 - contrast);
-
-                        for (let i = 0; i < data.length; i += 4) {
-                            let gray = data[i] * 0.299 + data[i + 1] * 0.587 + data[i + 2] * 0.114;
-                            gray = gray * contrast + intercept;
-                            gray = Math.min(255, Math.max(0, gray));
-                            data[i] = gray;
-                            data[i + 1] = gray;
-                            data[i + 2] = gray;
-                        }
-                        ctx.putImageData(imageData, 0, 0);
-                        resolve(canvas.toDataURL('image/jpeg', 0.95));
-                    };
-                    img.src = e.target.result;
-                };
-                reader.readAsDataURL(file);
-            });
-        }
-
-        // (1) 處理書籍封面拍照
-        async function handleBookImageUpload(event) {
-            const file = event.target.files[0];
+        // 預覽相片
+        function previewPhoto(e) {
+            const file = e.target.files[0];
             if (!file) return;
-
-            const previewBox = document.getElementById('bookPreviewBox');
-            const previewImg = document.getElementById('bookPreviewImg');
-            const loading = document.getElementById('bookOcrLoading');
-            
-            previewImg.src = URL.createObjectURL(file);
-            previewBox.classList.remove('hidden');
-            loading.classList.remove('hidden');
-
-            try {
-                const processedImg = await preprocessImage(file);
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('超時')), 5000));
-                const ocrPromise = (async () => {
-                    const worker = await Tesseract.createWorker('chi_tra+eng');
-                    const ret = await worker.recognize(processedImg);
-                    await worker.terminate();
-                    return ret.data.text;
-                })();
-
-                const text = await Promise.race([ocrPromise, timeoutPromise]);
-                const lines = text.split('\n').map(l => l.replace(/[^\w\u4e00-\u9fa5\s《》-]/g, '').trim()).filter(l => l.length >= 2);
-                if (lines.length > 0) {
-                    document.getElementById('bookTitleInput').value = lines[0];
-                }
-            } catch (err) {
-                console.warn('書籍 OCR 自動跳過：', err.message);
-            } finally {
-                loading.classList.add('hidden');
-            }
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                selectedBase64 = event.target.result;
+                document.getElementById('previewImg').src = selectedBase64;
+                document.getElementById('previewBox').classList.remove('hidden');
+            };
+            reader.readAsDataURL(file);
         }
 
-        // (2) 處理學生證拍照
-        async function handleIdImageUpload(event) {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const previewBox = document.getElementById('idPreviewBox');
-            const previewImg = document.getElementById('idPreviewImg');
-            const loading = document.getElementById('idOcrLoading');
-            
-            previewImg.src = URL.createObjectURL(file);
-            previewBox.classList.remove('hidden');
-            loading.classList.remove('hidden');
-
-            try {
-                const processedImg = await preprocessImage(file);
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('超時')), 5000));
-                const ocrPromise = (async () => {
-                    const worker = await Tesseract.createWorker('chi_tra+eng');
-                    const ret = await worker.recognize(processedImg);
-                    await worker.terminate();
-                    return ret.data.text;
-                })();
-
-                const text = await Promise.race([ocrPromise, timeoutPromise]);
-                const lines = text.split('\n').map(l => l.replace(/[^\w\u4e00-\u9fa5\s]/g, '').trim()).filter(l => l.length >= 2);
-                if (lines.length > 0) {
-                    document.getElementById('borrowerNameInput').value = lines[0];
-                }
-            } catch (err) {
-                console.warn('學生證 OCR 自動跳過：', err.message);
-            } finally {
-                loading.classList.add('hidden');
-            }
-        }
-
-        // 送出借書資料
-        async function submitBorrow() {
-            const bookTitle = document.getElementById('bookTitleInput').value.trim();
-            const borrowerName = document.getElementById('borrowerNameInput').value.trim();
-            const errorDiv = document.getElementById('borrowError');
-
-            if (!bookTitle || !borrowerName) {
-                errorDiv.innerText = "請輸入或拍攝書名與借書人姓名！";
-                errorDiv.classList.remove('hidden');
-                return;
-            }
-
-            const btn = document.getElementById('btnConfirmBorrow');
+        // 借用人：上傳照片
+        async function uploadBorrowPhoto() {
+            if (!selectedBase64) { alert('請先拍攝或選擇照片！'); return; }
+            const btn = document.getElementById('btnUpload');
             btn.disabled = true;
-            btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 儲存中...';
+            btn.innerHTML = '<i class="fa-solid fa-spinner animate-spin"></i> 上傳中...';
 
             try {
-                const response = await fetch(GAS_URL, {
+                const res = await fetch(GAS_URL, {
                     method: 'POST',
                     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({
-                        action: 'borrow',
-                        bookTitle: bookTitle,
-                        borrowerName: borrowerName
-                    })
+                    body: JSON.stringify({ action: 'uploadPhoto', imageBase64: selectedBase64 })
                 });
-
-                const res = await response.json();
-
-                if (res.status === 'success') {
-                    alert(res.message);
-                    // 清空輸入
-                    document.getElementById('bookTitleInput').value = '';
-                    document.getElementById('borrowerNameInput').value = '';
-                    document.getElementById('bookPreviewBox').classList.add('hidden');
-                    document.getElementById('idPreviewBox').classList.add('hidden');
-                    errorDiv.classList.add('hidden');
-                } else {
-                    errorDiv.innerText = res.message;
-                    errorDiv.classList.remove('hidden');
-                }
+                const result = await res.json();
+                alert(result.message);
+                selectedBase64 = '';
+                document.getElementById('previewBox').classList.add('hidden');
             } catch (err) {
-                errorDiv.innerText = "無法連接到資料庫，請檢查 GAS 部署權限！";
-                errorDiv.classList.remove('hidden');
+                alert('上傳失敗，請重試！');
             } finally {
                 btn.disabled = false;
-                btn.innerHTML = '<i class="fa-solid fa-check-circle"></i> 確認辦理借書';
+                btn.innerHTML = '<i class="fa-solid fa-paper-plane"></i> 上傳照片辦理借書';
             }
         }
 
-        // 管理員登入驗證
+        // 管理員：登入
         function checkPassword() {
-            const pwd = document.getElementById('adminPassword').value;
-            if (pwd === '1212') {
+            if (document.getElementById('adminPassword').value === '1212') {
                 document.getElementById('admin-login').classList.add('hidden');
                 document.getElementById('admin-content').classList.remove('hidden');
-                fetchBorrowRecords();
-            } else {
-                alert('密碼錯誤！');
-            }
+                loadSystemData();
+            } else { alert('密碼錯誤！'); }
         }
 
-        // 獲取借閱記錄
-        async function fetchBorrowRecords() {
-            const tbody = document.getElementById('recordsTableBody');
-            tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400"><i class="fa-solid fa-spinner animate-spin"></i> 載入資料中...</td></tr>';
-
+        // 載入資料庫下拉選單與紀錄
+        async function loadSystemData() {
             try {
                 const res = await fetch(GAS_URL);
-                const rawText = await res.text();
-                let result;
-                try {
-                    result = JSON.parse(rawText);
-                } catch (e) {
-                    throw new Error("GAS 回傳非 JSON 格式！請確認 Apps Script 部署權限是否設為「任何人 (Anyone)」。");
-                }
-
-                if (result.status === 'success' && result.data.length > 0) {
-                    tbody.innerHTML = result.data.map(item => `
-                        <tr class="hover:bg-slate-50">
-                            <td class="p-4 font-semibold text-slate-800">《${item.bookTitle}》</td>
-                            <td class="p-4 text-slate-600">${item.borrowerName}</td>
-                            <td class="p-4 text-slate-500 text-xs">${item.borrowDate} <span class="text-indigo-600">(${item.status})</span></td>
-                            <td class="p-4 text-center space-x-2">
-                                <button onclick="handleAction('renew', '${item.id}')" class="px-2.5 py-1 bg-amber-100 text-amber-700 hover:bg-amber-200 rounded text-xs font-medium">續借</button>
-                                <button onclick="handleAction('return', '${item.id}')" class="px-2.5 py-1 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 rounded text-xs font-medium">已還書</button>
-                            </td>
-                        </tr>
-                    `).join('');
-                } else {
-                    tbody.innerHTML = '<tr><td colspan="4" class="p-4 text-center text-slate-400">目前沒有借出中的記錄。</td></tr>';
-                }
-            } catch (err) {
-                tbody.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-rose-500 font-medium">❌ 載入失敗：${err.message}</td></tr>`;
-            }
-        }
-
-        // 還書 (刪除) 與 續借 (更新)
-        async function handleAction(action, id) {
-            const confirmMsg = action === 'return' ? '確認已還書？此記錄將從資料庫中刪除。' : '確認辦理續借？';
-            if (!confirm(confirmMsg)) return;
-
-            try {
-                const response = await fetch(GAS_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({ action: action, id: id })
+                const data = await res.json();
+                
+                // 下拉選單：未借出的書
+                const bookSelect = document.getElementById('selectBook');
+                bookSelect.innerHTML = '<option value="">-- 請選擇可借出書籍 --</option>';
+                data.books.filter(b => b.status !== '已借出').forEach(b => {
+                    bookSelect.innerHTML += `<option value="${b.id}">${b.id} - ${b.title}</option>`;
                 });
 
-                const res = await response.json();
-                alert(res.message);
-                fetchBorrowRecords();
-            } catch (err) {
-                alert('操作失敗：' + err.message);
-            }
+                // 下拉選單：學生
+                const studentSelect = document.getElementById('selectStudent');
+                studentSelect.innerHTML = '<option value="">-- 請選擇學生 --</option>';
+                data.students.forEach(s => {
+                    studentSelect.innerHTML += `<option value="${s.id}">${s.id} - ${s.name}</option>`;
+                });
+
+                // 表格列表
+                const tbody = document.getElementById('recordsTbody');
+                tbody.innerHTML = data.records.reverse().map(r => `
+                    <tr>
+                        <td class="p-3 text-xs text-slate-400">${r.date}</td>
+                        <td class="p-3">${r.photoUrl.startsWith('http') ? `<a href="${r.photoUrl}" target="_blank" class="text-indigo-600 font-semibold underline text-xs">查看照片</a>` : '無'}</td>
+                        <td class="p-3 font-semibold">${r.bookId || '-'}</td>
+                        <td class="p-3">${r.studentId || '-'}</td>
+                        <td class="p-3 text-xs"><span class="px-2 py-1 rounded bg-slate-100">${r.status}</span></td>
+                        <td class="p-3 text-center">
+                            ${r.bookId ? `<button onclick="returnBook('${r.bookId}')" class="px-2 py-1 bg-rose-100 text-rose-700 rounded text-xs">辦理還書</button>` : '<span class="text-xs text-slate-300">待填寫</span>'}
+                        </td>
+                    </tr>
+                `).join('');
+
+            } catch (err) { console.error(err); }
+        }
+
+        function syncBookInput() { document.getElementById('inputBookId').value = document.getElementById('selectBook').value; }
+        function syncStudentInput() { document.getElementById('inputStudentId').value = document.getElementById('selectStudent').value; }
+
+        // 管理員：提交借出
+        async function submitAdminIssue() {
+            const bookId = document.getElementById('inputBookId').value.trim();
+            const studentId = document.getElementById('inputStudentId').value.trim();
+
+            if (!bookId || !studentId) { alert('請輸入/選擇書籍編號及學生編號！'); return; }
+
+            const res = await fetch(GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'issueBook', bookId: bookId, studentId: studentId })
+            });
+            const result = await res.json();
+            alert(result.message);
+            loadSystemData();
+        }
+
+        // 管理員：還書
+        async function returnBook(bookId) {
+            if (!confirm(`確認還書 (書號: ${bookId})？`)) return;
+            const res = await fetch(GAS_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({ action: 'returnBook', bookId: bookId })
+            });
+            const result = await res.json();
+            alert(result.message);
+            loadSystemData();
         }
     </script>
 </body>
